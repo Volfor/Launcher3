@@ -179,6 +179,10 @@
     <!-- Text to indicate that the system icon badging setting is off [CHAR LIMIT=100] -->
     <string name="icon_badging_desc_off">Off</string>
 
+    <!-- Icon Pack -->
+    <string name="icon_pack">Icon Pack</string>
+    <string name="icon_pack_summary">Select an icon Pack</string>
+
     <!-- Label for the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=40] -->
     <string name="auto_add_shortcuts_label">Add icon to Home screen</string>
     <!-- Text description of the setting that allows the automatic placement of launcher shortcuts for applications and games installed on the device [CHAR LIMIT=NONE] -->

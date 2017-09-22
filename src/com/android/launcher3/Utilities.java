@@ -28,16 +28,20 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.PaintFlagsDrawFilter;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.PaintDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.DeadObjectException;
 import android.os.PowerManager;
 import android.os.TransactionTooLargeException;
-import android.support.v4.os.BuildCompat;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
@@ -83,6 +87,17 @@ public final class Utilities {
     private static final float[] sPoint = new float[2];
     private static final Matrix sMatrix = new Matrix();
     private static final Matrix sInverseMatrix = new Matrix();
+
+    private static final Rect sOldBounds = new Rect();
+    private static final Canvas sCanvas = new Canvas();
+
+    static {
+        sCanvas.setDrawFilter(new PaintFlagsDrawFilter(Paint.DITHER_FLAG,
+                Paint.FILTER_BITMAP_FLAG));
+    }
+
+    static int sColors[] = { 0xffff0000, 0xff00ff00, 0xff0000ff };
+    static int sColorIndex = 0;
 
     public static boolean isAtLeastO() {
         return Build.VERSION.SDK_INT >= 26;
@@ -144,6 +159,99 @@ public final class Utilities {
             return originalSmallestWidth >= 600;
         }
         return false;
+    }
+
+    private static int getIconBitmapSize(Context context) {
+        return LauncherAppState.getInstance(context).getInvariantDeviceProfile().iconBitmapSize;
+    }
+
+    /**
+     * Returns a bitmap which is of the appropriate size to be displayed as an icon
+     */
+    public static Bitmap createIconBitmap(Bitmap icon, Context context) {
+        final int iconBitmapSize = getIconBitmapSize(context);
+        if (iconBitmapSize == icon.getWidth() && iconBitmapSize == icon.getHeight()) {
+            return icon;
+        }
+        return createIconBitmap(new BitmapDrawable(context.getResources(), icon), context);
+    }
+
+
+    /**
+     * Returns a bitmap suitable for the all apps view.
+     */
+    public static Bitmap createIconBitmap(Drawable icon, Context context) {
+        return createIconBitmap(icon, context, 1.0f /* scale */);
+    }
+
+    /**
+     * @param scale the scale to apply before drawing {@param icon} on the canvas
+     */
+    public static Bitmap createIconBitmap(Drawable icon, Context context, float scale) {
+        synchronized (sCanvas) {
+            final int iconBitmapSize = getIconBitmapSize(context);
+
+            int width = iconBitmapSize;
+            int height = iconBitmapSize;
+
+            if (icon instanceof PaintDrawable) {
+                PaintDrawable painter = (PaintDrawable) icon;
+                painter.setIntrinsicWidth(width);
+                painter.setIntrinsicHeight(height);
+            } else if (icon instanceof BitmapDrawable) {
+                // Ensure the bitmap has a density.
+                BitmapDrawable bitmapDrawable = (BitmapDrawable) icon;
+                Bitmap bitmap = bitmapDrawable.getBitmap();
+                if (bitmap != null && bitmap.getDensity() == Bitmap.DENSITY_NONE) {
+                    bitmapDrawable.setTargetDensity(context.getResources().getDisplayMetrics());
+                }
+            }
+            int sourceWidth = icon.getIntrinsicWidth();
+            int sourceHeight = icon.getIntrinsicHeight();
+            if (sourceWidth > 0 && sourceHeight > 0) {
+                // Scale the icon proportionally to the icon dimensions
+                final float ratio = (float) sourceWidth / sourceHeight;
+                if (sourceWidth > sourceHeight) {
+                    height = (int) (width / ratio);
+                } else if (sourceHeight > sourceWidth) {
+                    width = (int) (height * ratio);
+                }
+            }
+
+            // no intrinsic size --> use default size
+            int textureWidth = iconBitmapSize;
+            int textureHeight = iconBitmapSize;
+
+            final Bitmap bitmap = Bitmap.createBitmap(textureWidth, textureHeight,
+                    Bitmap.Config.ARGB_8888);
+            final Canvas canvas = sCanvas;
+            canvas.setBitmap(bitmap);
+
+            final int left = (textureWidth-width) / 2;
+            final int top = (textureHeight-height) / 2;
+
+            @SuppressWarnings("all") // suppress dead code warning
+            final boolean debug = false;
+            if (debug) {
+                // draw a big box for the icon for debugging
+                canvas.drawColor(sColors[sColorIndex]);
+                if (++sColorIndex >= sColors.length) sColorIndex = 0;
+                Paint debugPaint = new Paint();
+                debugPaint.setColor(0xffcccc00);
+                canvas.drawRect(left, top, left+width, top+height, debugPaint);
+            }
+
+            sOldBounds.set(icon.getBounds());
+            icon.setBounds(left, top, left+width, top+height);
+            canvas.save(Canvas.MATRIX_SAVE_FLAG);
+            canvas.scale(scale, scale, textureWidth / 2, textureHeight / 2);
+            icon.draw(canvas);
+            canvas.restore();
+            icon.setBounds(sOldBounds);
+            canvas.setBitmap(null);
+
+            return bitmap;
+        }
     }
 
     /**

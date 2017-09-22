@@ -111,25 +111,36 @@ public class LauncherModel extends BroadcastReceiver
     private static final int ITEMS_CHUNK = 6; // batch size for the workspace icons
     private static final long INVALID_SCREEN_ID = -1L;
 
-    @Thunk final LauncherAppState mApp;
-    @Thunk final Object mLock = new Object();
-    @Thunk DeferredHandler mHandler = new DeferredHandler();
-    @Thunk LoaderTask mLoaderTask;
-    @Thunk boolean mIsLoaderTaskRunning;
-    @Thunk boolean mHasLoaderCompletedOnce;
-    @Thunk boolean mIsManagedHeuristicAppsUpdated;
+    @Thunk
+    final LauncherAppState mApp;
+    @Thunk
+    final Object mLock = new Object();
+    @Thunk
+    DeferredHandler mHandler = new DeferredHandler();
+    @Thunk
+    LoaderTask mLoaderTask;
+    @Thunk
+    boolean mIsLoaderTaskRunning;
+    @Thunk
+    boolean mHasLoaderCompletedOnce;
+    @Thunk
+    boolean mIsManagedHeuristicAppsUpdated;
 
-    @Thunk static final HandlerThread sWorkerThread = new HandlerThread("launcher-loader");
+    @Thunk
+    static final HandlerThread sWorkerThread = new HandlerThread("launcher-loader");
     static {
         sWorkerThread.start();
     }
-    @Thunk static final Handler sWorker = new Handler(sWorkerThread.getLooper());
+    @Thunk
+    static final Handler sWorker = new Handler(sWorkerThread.getLooper());
 
     // Indicates whether the current model data is valid or not.
     // We start off with everything not loaded. After that, we assume that
     // our monitoring of the package manager provides all updates and we never
     // need to do a requery. This is only ever touched from the loader thread.
     private boolean mModelLoaded;
+    private boolean mAllAppsLoaded;
+
     public boolean isModelLoaded() {
         synchronized (mLock) {
             return mModelLoaded && mLoaderTask == null;
@@ -142,7 +153,8 @@ public class LauncherModel extends BroadcastReceiver
      */
     static final ArrayList<Runnable> mBindCompleteRunnables = new ArrayList<Runnable>();
 
-    @Thunk WeakReference<Callbacks> mCallbacks;
+    @Thunk
+    WeakReference<Callbacks> mCallbacks;
 
     // < only access in worker thread >
     private final AllAppsList mBgAllAppsList;
@@ -195,7 +207,7 @@ public class LauncherModel extends BroadcastReceiver
                                   ArrayList<AppInfo> addedApps);
         public void bindAppsUpdated(ArrayList<AppInfo> apps);
         public void bindShortcutsChanged(ArrayList<ShortcutInfo> updated,
-                ArrayList<ShortcutInfo> removed, UserHandle user);
+                                         ArrayList<ShortcutInfo> removed, UserHandle user);
         public void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets);
         public void bindRestoreItemsChange(HashSet<ItemInfo> updates);
         public void bindWorkspaceComponentsRemoved(
@@ -503,6 +515,16 @@ public class LauncherModel extends BroadcastReceiver
         startLoaderFromBackground();
     }
 
+    public void resetLoadedState(boolean resetAllAppsLoaded, boolean resetModelLoaded) {
+        synchronized (mLock) {
+            // Stop any existing loaders first, so they don't set mAllAppsLoaded or
+            // mModelLoaded to true later
+            stopLoaderLocked();
+            if (resetAllAppsLoaded) mAllAppsLoaded = false;
+            if (resetModelLoaded) mModelLoaded = false;
+        }
+    }
+
     /**
      * When the launcher is in the background, it's possible for it to miss paired
      * configuration changes.  So whenever we trigger the loader from the background
@@ -554,7 +576,7 @@ public class LauncherModel extends BroadcastReceiver
                 // If there is already one running, tell it to stop.
                 stopLoaderLocked();
                 mLoaderTask = new LoaderTask(mApp.getContext(), synchronousBindPage);
-                if (synchronousBindPage != PagedView.INVALID_RESTORE_PAGE
+                if (synchronousBindPage != PagedView.INVALID_RESTORE_PAGE && mAllAppsLoaded
                         && mModelLoaded && !mIsLoaderTaskRunning) {
                     mLoaderTask.runBindSynchronousPage(synchronousBindPage);
                     return true;
@@ -598,9 +620,11 @@ public class LauncherModel extends BroadcastReceiver
         private Context mContext;
         private int mPageToBindFirst;
 
-        @Thunk boolean mIsLoadingAndBindingWorkspace;
+        @Thunk
+        boolean mIsLoadingAndBindingWorkspace;
         private boolean mStopped;
-        @Thunk boolean mLoadAndBindStepFinished;
+        @Thunk
+        boolean mLoadAndBindStepFinished;
 
         LoaderTask(Context context, int pageToBindFirst) {
             mContext = context;
@@ -1992,7 +2016,8 @@ public class LauncherModel extends BroadcastReceiver
         }
     }
 
-    @Thunk class DeferredMainThreadExecutor implements Executor {
+    @Thunk
+    class DeferredMainThreadExecutor implements Executor {
 
         @Override
         public void execute(Runnable command) {

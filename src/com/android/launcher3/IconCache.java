@@ -82,7 +82,8 @@ public class IconCache {
 
     private static final int LOW_RES_SCALE_FACTOR = 5;
 
-    @Thunk static final Object ICON_UPDATE_TOKEN = new Object();
+    @Thunk
+    static final Object ICON_UPDATE_TOKEN = new Object();
 
     public static class CacheEntry {
         public Bitmap icon;
@@ -92,19 +93,23 @@ public class IconCache {
     }
 
     private final HashMap<UserHandle, Bitmap> mDefaultIcons = new HashMap<>();
-    @Thunk final MainThreadExecutor mMainThreadExecutor = new MainThreadExecutor();
+    @Thunk
+    final MainThreadExecutor mMainThreadExecutor = new MainThreadExecutor();
 
     private final Context mContext;
     private final PackageManager mPackageManager;
     private IconProvider mIconProvider;
-    @Thunk final UserManagerCompat mUserManager;
+    @Thunk
+    final UserManagerCompat mUserManager;
     private final LauncherAppsCompat mLauncherApps;
     private final HashMap<ComponentKey, CacheEntry> mCache =
             new HashMap<ComponentKey, CacheEntry>(INITIAL_ICON_CACHE_CAPACITY);
     private final int mIconDpi;
-    @Thunk final IconDB mIconDb;
+    @Thunk
+    final IconDB mIconDb;
 
-    @Thunk final Handler mWorkerHandler;
+    @Thunk
+    final Handler mWorkerHandler;
 
     // The background color used for activity icons. Since these icons are displayed in all-apps
     // and folders, this would be same as the light quantum panel background. This color
@@ -159,7 +164,7 @@ public class IconCache {
         Resources resources;
         try {
             resources = mPackageManager.getResourcesForApplication(packageName);
-        } catch (PackageManager.NameNotFoundException e) {
+        } catch (NameNotFoundException e) {
             resources = null;
         }
         if (resources != null) {
@@ -175,7 +180,7 @@ public class IconCache {
         try {
             resources = mPackageManager.getResourcesForApplication(
                     info.applicationInfo);
-        } catch (PackageManager.NameNotFoundException e) {
+        } catch (NameNotFoundException e) {
             resources = null;
         }
         if (resources != null) {
@@ -189,7 +194,7 @@ public class IconCache {
     }
 
     public Drawable getFullResIcon(LauncherActivityInfo info) {
-        return mIconProvider.getIcon(info, mIconDpi);
+        return info.getIcon(mIconDpi);
     }
 
     protected Bitmap makeDefaultIcon(UserHandle user) {
@@ -366,8 +371,9 @@ public class IconCache {
      *                        the memory. This is useful then the previous bitmap was created using
      *                        old data.
      */
-    @Thunk synchronized void addIconToDBAndMemCache(LauncherActivityInfo app,
-            PackageInfo info, long userSerial, boolean replaceExisting) {
+    @Thunk
+    synchronized void addIconToDBAndMemCache(LauncherActivityInfo app,
+                                             PackageInfo info, long userSerial, boolean replaceExisting) {
         final ComponentKey key = new ComponentKey(app.getComponentName(), app.getUser());
         CacheEntry entry = null;
         if (!replaceExisting) {
@@ -431,6 +437,10 @@ public class IconCache {
         };
         mWorkerHandler.post(request);
         return new IconLoadRequest(request, mWorkerHandler);
+    }
+
+    private Bitmap getNonNullIcon(CacheEntry entry, UserHandle user) {
+        return entry.icon == null ? getDefaultIcon(user) : entry.icon;
     }
 
     /**
@@ -497,7 +507,14 @@ public class IconCache {
     private void applyCacheEntry(CacheEntry entry, ItemInfoWithIcon info) {
         info.title = Utilities.trim(entry.title);
         info.contentDescription = entry.contentDescription;
-        info.iconBitmap = entry.icon == null ? getDefaultIcon(info.user) : entry.icon;
+        IconPack iconPack = IconPackProvider.loadAndGetIconPack(mContext);
+
+        Drawable icon = null;
+        if (iconPack != null && info.getTargetComponent() != null) {
+            icon = iconPack.getIcon(info.getTargetComponent());
+        }
+
+        info.iconBitmap = icon == null ? getNonNullIcon(entry, info.user) : Utilities.createIconBitmap(icon, mContext);
         info.usingLowResIcon = entry.isLowResIcon;
     }
 
@@ -714,16 +731,18 @@ public class IconCache {
      * LauncherActivityInfo list. Items are updated/added one at a time, so that the
      * worker thread doesn't get blocked.
      */
-    @Thunk class SerializedIconUpdateTask implements Runnable {
+    @Thunk
+    class SerializedIconUpdateTask implements Runnable {
         private final long mUserSerial;
         private final HashMap<String, PackageInfo> mPkgInfoMap;
         private final Stack<LauncherActivityInfo> mAppsToAdd;
         private final Stack<LauncherActivityInfo> mAppsToUpdate;
         private final HashSet<String> mUpdatedPackages = new HashSet<String>();
 
-        @Thunk SerializedIconUpdateTask(long userSerial, HashMap<String, PackageInfo> pkgInfoMap,
-                Stack<LauncherActivityInfo> appsToAdd,
-                Stack<LauncherActivityInfo> appsToUpdate) {
+        @Thunk
+        SerializedIconUpdateTask(long userSerial, HashMap<String, PackageInfo> pkgInfoMap,
+                                 Stack<LauncherActivityInfo> appsToAdd,
+                                 Stack<LauncherActivityInfo> appsToUpdate) {
             mUserSerial = userSerial;
             mPkgInfoMap = pkgInfoMap;
             mAppsToAdd = appsToAdd;
